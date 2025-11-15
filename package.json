@@ -1,0 +1,30 @@
+{
+  "name": "skywidget",
+  "version": "0.1.0",
+  "description": "跨平台硬件监控桌面磁贴应用",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-shell": "^2.0.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.4",
+    "@tauri-apps/cli": "^2.2.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prettier": "^3.4.2",
+    "prettier-plugin-svelte": "^3.3.2",
+    "svelte": "^5.19.0",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.11"
+  }
+}

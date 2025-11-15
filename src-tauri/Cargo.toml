@@ -1,0 +1,32 @@
+[package]
+name = "skywidget"
+version = "0.1.0"
+description = "跨平台硬件监控桌面磁贴应用"
+authors = ["Geoffrey Wang"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.2", features = [] }
+
+[dependencies]
+tauri = { version = "2.2", features = [] }
+tauri-plugin-shell = "2.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 硬件监控核心依赖
+sysinfo = "0.32"
+
+[features]
+# 默认包含自定义协议
+default = ["custom-protocol"]
+# 自定义协议功能
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+# 发布版本优化
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "z"  # 优化大小
+strip = true     # 移除调试符号

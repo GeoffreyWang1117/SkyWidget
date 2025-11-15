@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git remote add:*)",
+      "Bash(rustc:*)",
+      "Bash(node:*)",
+      "Bash(pnpm:*)",
+      "Bash(echo:*)",
+      "Bash(where:*)",
+      "Bash(reg query \"HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}\" /v pv)",
+      "Bash(setx PATH \"%PATH%;%USERPROFILE%\\.cargo\\bin\")",
+      "Bash(\"$USERPROFILE/.cargo/bin/rustc.exe\" --version)",
+      "Bash(\"$USERPROFILE/.cargo/bin/cargo.exe\" --version)",
+      "Bash(docker --version:*)",
+      "Bash(powershell.exe -Command \"Get-Command scoop -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(powershell.exe -Command \"Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force\")",
+      "Bash(powershell.exe -Command \"irm get.scoop.sh | iex\")",
+      "Bash(powershell.exe -Command \"scoop --version\")",
+      "Bash(powershell.exe -Command \"$env:USERPROFILE\\scoop\\shims\\scoop.cmd --version\")",
+      "Bash(\"C:/Users/wzhh9/scoop/shims/scoop\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/shims/scoop\" install nodejs-lts)",
+      "Bash(\"C:/Users/wzhh9/scoop/shims/node\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/shims/npm\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/apps/nodejs-lts/current/node.exe\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/apps/nodejs-lts/current/npm.cmd\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/apps/nodejs-lts/current/npm.cmd\" install -g pnpm)",
+      "Bash(\"C:/Users/wzhh9/scoop/apps/nodejs-lts/current/pnpm.cmd\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/apps/nodejs-lts/current/npm.cmd\" prefix -g)",
+      "Bash(\"C:/Users/wzhh9/scoop/persist/nodejs-lts/bin/pnpm.cmd\" --version)",
+      "Bash(\"C:/Users/wzhh9/scoop/persist/nodejs-lts/bin/pnpm.cmd\" create tauri-app --help)",
+      "Bash(powershell.exe -Command \"$env:PATH = \"\"C:\\Users\\wzhh9\\scoop\\apps\\nodejs-lts\\current;C:\\Users\\wzhh9\\scoop\\persist\\nodejs-lts\\bin;\"\" + $env:PATH; cd ''C:\\Users\\wzhh9\\Projects\\tauri-monitor''; pnpm --version\")",
+      "Bash(tree:*)",
+      "Bash(git add:*)",
+      "Bash(cargo:*)",
+      "Bash(npm --version:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
