@@ -33,7 +33,17 @@
       "Bash(tree:*)",
       "Bash(git add:*)",
       "Bash(cargo:*)",
-      "Bash(npm --version:*)"
+      "Bash(npm --version:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Tauri + Svelte 5 项目脚手架\n\n✨ 功能特性\n- 配置 Tauri 2.x + Svelte 5 + TailwindCSS 4 技术栈\n- 添加 sysinfo 硬件监控依赖\n- 实现基础 greet 和 get_system_info 命令\n- 配置 Vite 6 构建工具和热重载\n\n🛠️ 开发环境\n- 配置 Scoop 包管理器\n- 添加 Prettier 代码格式化\n- 配置 VSCode 工作区（推荐插件）\n- 设置 Git 忽略规则\n\n📚 文档\n- README: 项目说明和快速开始\n- SETUP_GUIDE: 详细配置指南\n- NEXT_STEPS: 下一步操作指引\n- setup.ps1: 自动化安装脚本\n\n🎯 项目结构\n- src/: Svelte 5 前端 (组件/状态/工具)\n- src-tauri/: Rust 后端 (Tauri 主程序)\n- 完整的跨平台开发环境配置\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git config:*)",
+      "Bash(ssh-keygen:*)",
+      "Bash(cat:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git push:*)",
+      "Bash(ssh:*)",
+      "Bash(mkdir:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell.exe -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; echo ''Node processes terminated''\")"
     ],
     "deny": [],
     "ask": []
