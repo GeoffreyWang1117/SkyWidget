@@ -9,6 +9,8 @@
   import AlertPanel from './lib/components/AlertPanel.svelte'
   import AlertHistoryPanel from './lib/components/AlertHistoryPanel.svelte'
   import AddAlertRulePanel from './lib/components/AddAlertRulePanel.svelte'
+  import TemperatureMonitor from './lib/components/TemperatureMonitor.svelte'
+  import MetricsChart from './lib/components/MetricsChart.svelte'
 
   let hardwareInfo = $state<AllHardwareInfo | null>(null)
   let loading = $state(true)
@@ -98,7 +100,7 @@
       </div>
     {:else if hardwareInfo}
       <!-- 硬件监控面板 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <!-- CPU 监控 -->
         <CpuMonitor cpuInfo={hardwareInfo.cpu} />
 
@@ -107,6 +109,9 @@
 
         <!-- 磁盘监控 -->
         <DiskMonitor diskInfo={hardwareInfo.disk} />
+
+        <!-- 温度监控 -->
+        <TemperatureMonitor />
       </div>
 
       <!-- 网络和告警面板 -->
@@ -127,6 +132,11 @@
       <!-- 告警历史面板 -->
       <div class="mb-6">
         <AlertHistoryPanel />
+      </div>
+
+      <!-- 性能趋势图表 -->
+      <div class="mb-6">
+        <MetricsChart />
       </div>
 
       <!-- 底部信息 -->

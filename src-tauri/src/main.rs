@@ -10,7 +10,7 @@ use alerts::engine::AlertEngine;
 use alerts::notifier::AlertNotifier;
 use alerts::rules::{default_rules, AlertCondition, AlertRule, AlertSeverity};
 use log::info;
-use monitors::{CpuMonitor, DiskMonitor, MemoryMonitor};
+use monitors::{CpuMonitor, DiskMonitor, MemoryMonitor, TemperatureMonitor};
 use network::api::{start_api_server, ApiState};
 use network::discovery::DiscoveryService;
 use network::node::{Node, NodeInfo};
@@ -20,7 +20,11 @@ use std::sync::Arc;
 use storage::alerts_store::{AlertRecord, AlertsStore};
 use storage::metrics::MetricsStore;
 use sysinfo::System;
-use tauri::{Manager, State};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, State,
+};
 use tokio::sync::RwLock;
 
 // 全局状态管理
@@ -28,6 +32,7 @@ pub struct AppState {
     cpu_monitor: Arc<RwLock<CpuMonitor>>,
     memory_monitor: Arc<RwLock<MemoryMonitor>>,
     disk_monitor: Arc<RwLock<DiskMonitor>>,
+    temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
     node_info: Arc<RwLock<NodeInfo>>,
     discovered_nodes: Arc<RwLock<Vec<NodeInfo>>>,
     alert_engine: Arc<RwLock<Option<Arc<AlertEngine>>>>,
@@ -230,6 +235,48 @@ async fn export_metrics(state: State<'_, AppState>) -> Result<String, String> {
     store.export_json()
 }
 
+// 获取温度信息
+#[tauri::command]
+async fn get_temperature_info(
+    state: State<'_, AppState>,
+) -> Result<monitors::temperature::TemperatureInfo, String> {
+    let mut monitor = state.temperature_monitor.write().await;
+    Ok(monitor.get_info())
+}
+
+// 检查是否支持温度监控
+#[tauri::command]
+async fn is_temperature_supported(state: State<'_, AppState>) -> Result<bool, String> {
+    let monitor = state.temperature_monitor.read().await;
+    Ok(monitor.is_supported())
+}
+
+// 获取指标历史数据（用于图表）
+#[tauri::command]
+async fn get_metrics_history(
+    state: State<'_, AppState>,
+    metric_name: String,
+    max_points: Option<usize>,
+) -> Result<Vec<storage::metrics::MetricDataPoint>, String> {
+    let store = state.metrics_store.read().await;
+
+    if let Some(data) = store.get_metric(&metric_name) {
+        let points = if let Some(max) = max_points {
+            let start = if data.len() > max {
+                data.len() - max
+            } else {
+                0
+            };
+            data[start..].to_vec()
+        } else {
+            data.clone()
+        };
+        Ok(points)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // 初始化日志
@@ -255,6 +302,7 @@ async fn main() {
     let cpu_monitor = Arc::new(RwLock::new(CpuMonitor::new()));
     let memory_monitor = Arc::new(RwLock::new(MemoryMonitor::new()));
     let disk_monitor = Arc::new(RwLock::new(DiskMonitor::new()));
+    let temperature_monitor = Arc::new(RwLock::new(TemperatureMonitor::new()));
 
     // 已发现的节点列表
     let discovered_nodes = Arc::new(RwLock::new(Vec::new()));
@@ -385,6 +433,7 @@ async fn main() {
         cpu_monitor: cpu_monitor.clone(),
         memory_monitor: memory_monitor.clone(),
         disk_monitor: disk_monitor.clone(),
+        temperature_monitor: temperature_monitor.clone(),
         node_info: node_info.clone(),
         discovered_nodes: discovered_nodes.clone(),
         alert_engine,
@@ -429,6 +478,8 @@ async fn main() {
             get_memory_info,
             get_disk_info,
             get_all_hardware_info,
+            get_temperature_info,
+            is_temperature_supported,
             get_local_node_info,
             get_discovered_nodes,
             get_alert_rules,
@@ -440,7 +491,61 @@ async fn main() {
             remove_alert_rule,
             export_alert_history,
             export_metrics,
+            get_metrics_history,
         ])
+        .setup(|app| {
+            // 创建系统托盘菜单
+            let show_i = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+            let hide_i = MenuItem::with_id(app, "hide", "隐藏窗口", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+
+            let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i])?;
+
+            // 创建系统托盘图标
+            let _tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("SkyWidget - 硬件监控")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "hide" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.hide();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    // 双击托盘图标显示窗口
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
+                })
+                .build(app)?;
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
