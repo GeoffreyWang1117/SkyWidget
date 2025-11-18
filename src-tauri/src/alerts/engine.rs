@@ -7,6 +7,7 @@ use tokio::time::{interval, Duration};
 use super::notifier::AlertNotifier;
 use super::rules::{AlertRule, AlertSeverity};
 use crate::monitors::{CpuMonitor, DiskMonitor, MemoryMonitor};
+use crate::storage::alerts_store::AlertsStore;
 
 /// 告警引擎
 pub struct AlertEngine {
@@ -24,6 +25,9 @@ pub struct AlertEngine {
 
     /// 磁盘监控器
     disk_monitor: Arc<RwLock<DiskMonitor>>,
+
+    /// 告警历史存储
+    alerts_store: Option<Arc<RwLock<AlertsStore>>>,
 }
 
 impl AlertEngine {
@@ -41,7 +45,13 @@ impl AlertEngine {
             cpu_monitor,
             memory_monitor,
             disk_monitor,
+            alerts_store: None,
         }
+    }
+
+    /// 设置告警历史存储
+    pub fn set_alerts_store(&mut self, store: Arc<RwLock<AlertsStore>>) {
+        self.alerts_store = Some(store);
     }
 
     /// 启动告警引擎（定期检查）
@@ -53,6 +63,7 @@ impl AlertEngine {
         let cpu_monitor = self.cpu_monitor.clone();
         let memory_monitor = self.memory_monitor.clone();
         let disk_monitor = self.disk_monitor.clone();
+        let alerts_store = self.alerts_store.clone();
 
         tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(check_interval_seconds));
@@ -73,6 +84,17 @@ impl AlertEngine {
                     if rule.should_trigger(&metrics) {
                         let message = rule.generate_message(&metrics);
                         info!("Alert triggered: {}", message);
+
+                        // 保存到告警历史
+                        if let Some(store) = &alerts_store {
+                            let mut store_guard = store.write().await;
+                            store_guard.add_record(
+                                &rule.id,
+                                &rule.name,
+                                &message,
+                                &rule.severity,
+                            );
+                        }
 
                         // 发送通知
                         notifier.send_alert(

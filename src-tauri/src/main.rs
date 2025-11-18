@@ -8,7 +8,7 @@ mod storage;
 
 use alerts::engine::AlertEngine;
 use alerts::notifier::AlertNotifier;
-use alerts::rules::{default_rules, AlertRule};
+use alerts::rules::{default_rules, AlertCondition, AlertRule, AlertSeverity};
 use log::info;
 use monitors::{CpuMonitor, DiskMonitor, MemoryMonitor};
 use network::api::{start_api_server, ApiState};
@@ -17,6 +17,8 @@ use network::node::{Node, NodeInfo};
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Arc;
+use storage::alerts_store::{AlertRecord, AlertsStore};
+use storage::metrics::MetricsStore;
 use sysinfo::System;
 use tauri::{Manager, State};
 use tokio::sync::RwLock;
@@ -29,6 +31,8 @@ pub struct AppState {
     node_info: Arc<RwLock<NodeInfo>>,
     discovered_nodes: Arc<RwLock<Vec<NodeInfo>>>,
     alert_engine: Arc<RwLock<Option<Arc<AlertEngine>>>>,
+    alerts_store: Arc<RwLock<AlertsStore>>,
+    metrics_store: Arc<RwLock<MetricsStore>>,
 }
 
 // 简单的问候命令
@@ -131,6 +135,101 @@ async fn toggle_alert_rule(
     }
 }
 
+// 获取告警历史记录
+#[tauri::command]
+async fn get_alert_history(state: State<'_, AppState>) -> Result<Vec<AlertRecord>, String> {
+    let store = state.alerts_store.read().await;
+    Ok(store.get_all_records())
+}
+
+// 确认告警
+#[tauri::command]
+async fn acknowledge_alert(state: State<'_, AppState>, record_id: String) -> Result<(), String> {
+    let mut store = state.alerts_store.write().await;
+    if store.acknowledge(&record_id) {
+        Ok(())
+    } else {
+        Err("Alert record not found".to_string())
+    }
+}
+
+// 清空告警历史
+#[tauri::command]
+async fn clear_alert_history(state: State<'_, AppState>) -> Result<(), String> {
+    let mut store = state.alerts_store.write().await;
+    store.clear();
+    Ok(())
+}
+
+// 添加新的告警规则
+#[tauri::command]
+async fn add_alert_rule(
+    state: State<'_, AppState>,
+    name: String,
+    description: String,
+    condition_type: String,
+    threshold: f32,
+    severity: String,
+) -> Result<(), String> {
+    let condition = match condition_type.as_str() {
+        "cpu_usage" => AlertCondition::CpuUsageAbove(threshold),
+        "memory_usage" => AlertCondition::MemoryUsageAbove(threshold),
+        "disk_usage" => AlertCondition::DiskUsageAbove(threshold),
+        "cpu_temperature" => AlertCondition::CpuTemperatureAbove(threshold),
+        _ => return Err("Invalid condition type".to_string()),
+    };
+
+    let severity = match severity.as_str() {
+        "Info" => AlertSeverity::Info,
+        "Warning" => AlertSeverity::Warning,
+        "Error" => AlertSeverity::Error,
+        "Critical" => AlertSeverity::Critical,
+        _ => return Err("Invalid severity".to_string()),
+    };
+
+    let rule = AlertRule::new(
+        uuid::Uuid::new_v4().to_string(),
+        name,
+        description,
+        condition,
+        severity,
+    );
+
+    let engine_opt = state.alert_engine.read().await;
+    if let Some(engine) = engine_opt.as_ref() {
+        engine.add_rule(rule).await;
+        Ok(())
+    } else {
+        Err("Alert engine not initialized".to_string())
+    }
+}
+
+// 删除告警规则
+#[tauri::command]
+async fn remove_alert_rule(state: State<'_, AppState>, rule_id: String) -> Result<(), String> {
+    let engine_opt = state.alert_engine.read().await;
+    if let Some(engine) = engine_opt.as_ref() {
+        engine.remove_rule(&rule_id).await;
+        Ok(())
+    } else {
+        Err("Alert engine not initialized".to_string())
+    }
+}
+
+// 导出告警历史为 JSON
+#[tauri::command]
+async fn export_alert_history(state: State<'_, AppState>) -> Result<String, String> {
+    let store = state.alerts_store.read().await;
+    store.export_json()
+}
+
+// 导出硬件指标数据
+#[tauri::command]
+async fn export_metrics(state: State<'_, AppState>) -> Result<String, String> {
+    let store = state.metrics_store.read().await;
+    store.export_json()
+}
+
 #[tokio::main]
 async fn main() {
     // 初始化日志
@@ -200,20 +299,86 @@ async fn main() {
     // 创建告警通知器
     let notifier = AlertNotifier::new(node_info.clone(), discovered_nodes.clone());
 
+    // 创建数据存储
+    let alerts_store = Arc::new(RwLock::new(AlertsStore::new(1000))); // 最多存储 1000 条记录
+    let metrics_store = Arc::new(RwLock::new(MetricsStore::new(86400))); // 24小时数据
+
     // 创建告警引擎
     let alert_rules = default_rules();
-    let engine = Arc::new(AlertEngine::new(
+    let mut engine = AlertEngine::new(
         alert_rules,
         notifier,
         cpu_monitor.clone(),
         memory_monitor.clone(),
         disk_monitor.clone(),
-    ));
+    );
+
+    // 设置告警历史存储
+    engine.set_alerts_store(alerts_store.clone());
 
     // 启动告警引擎（每 10 秒检查一次）
+    let engine = Arc::new(engine);
     engine.start(10).await;
 
-    let alert_engine = Arc::new(RwLock::new(Some(engine)));
+    let alert_engine = Arc::new(RwLock::new(Some(engine.clone())));
+
+    // 定期收集指标数据并存储
+    let metrics_store_clone = metrics_store.clone();
+    let cpu_monitor_clone = cpu_monitor.clone();
+    let memory_monitor_clone = memory_monitor.clone();
+    let disk_monitor_clone = disk_monitor.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(10));
+        loop {
+            interval.tick().await;
+
+            let mut store = metrics_store_clone.write().await;
+
+            // 收集 CPU 数据
+            {
+                let mut cpu = cpu_monitor_clone.write().await;
+                let cpu_info = cpu.get_info();
+                store.add_metric("cpu_usage", cpu_info.usage);
+            }
+
+            // 收集内存数据
+            {
+                let mut memory = memory_monitor_clone.write().await;
+                let memory_info = memory.get_info();
+                let usage_percent = if memory_info.total > 0 {
+                    (memory_info.used as f32 / memory_info.total as f32) * 100.0
+                } else {
+                    0.0
+                };
+                store.add_metric("memory_usage_percent", usage_percent);
+            }
+
+            // 收集磁盘数据
+            {
+                let mut disk = disk_monitor_clone.write().await;
+                let disk_info = disk.get_info();
+
+                let mut total_space = 0u64;
+                let mut total_used = 0u64;
+
+                for disk in &disk_info.disks {
+                    total_space += disk.total_space;
+                    total_used += disk.total_space - disk.available_space;
+                }
+
+                let usage_percent = if total_space > 0 {
+                    (total_used as f32 / total_space as f32) * 100.0
+                } else {
+                    0.0
+                };
+
+                store.add_metric("disk_usage_percent", usage_percent);
+            }
+
+            // 每小时清理一次旧数据
+            store.cleanup_old_data(86400); // 保留 24 小时
+        }
+    });
 
     // 创建应用状态
     let app_state = AppState {
@@ -223,6 +388,8 @@ async fn main() {
         node_info: node_info.clone(),
         discovered_nodes: discovered_nodes.clone(),
         alert_engine,
+        alerts_store,
+        metrics_store,
     };
 
     // 启动 HTTP API 服务器
@@ -266,6 +433,13 @@ async fn main() {
             get_discovered_nodes,
             get_alert_rules,
             toggle_alert_rule,
+            get_alert_history,
+            acknowledge_alert,
+            clear_alert_history,
+            add_alert_rule,
+            remove_alert_rule,
+            export_alert_history,
+            export_metrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

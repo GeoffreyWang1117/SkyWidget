@@ -7,6 +7,8 @@
   import DiskMonitor from './lib/components/DiskMonitor.svelte'
   import NetworkPanel from './lib/components/NetworkPanel.svelte'
   import AlertPanel from './lib/components/AlertPanel.svelte'
+  import AlertHistoryPanel from './lib/components/AlertHistoryPanel.svelte'
+  import AddAlertRulePanel from './lib/components/AddAlertRulePanel.svelte'
 
   let hardwareInfo = $state<AllHardwareInfo | null>(null)
   let loading = $state(true)
@@ -113,7 +115,18 @@
         <NetworkPanel />
 
         <!-- 告警规则面板 -->
-        <AlertPanel />
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100"></h2>
+            <AddAlertRulePanel />
+          </div>
+          <AlertPanel />
+        </div>
+      </div>
+
+      <!-- 告警历史面板 -->
+      <div class="mb-6">
+        <AlertHistoryPanel />
       </div>
 
       <!-- 底部信息 -->
