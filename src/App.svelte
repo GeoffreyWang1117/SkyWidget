@@ -5,6 +5,8 @@
   import CpuMonitor from './lib/components/CpuMonitor.svelte'
   import MemoryMonitor from './lib/components/MemoryMonitor.svelte'
   import DiskMonitor from './lib/components/DiskMonitor.svelte'
+  import NetworkPanel from './lib/components/NetworkPanel.svelte'
+  import AlertPanel from './lib/components/AlertPanel.svelte'
 
   let hardwareInfo = $state<AllHardwareInfo | null>(null)
   let loading = $state(true)
@@ -63,7 +65,7 @@
         SkyWidget
       </h1>
       <p class="text-gray-600 dark:text-gray-400 text-sm">
-        跨平台硬件监控桌面应用
+        分布式硬件监控与告警系统
       </p>
       {#if lastUpdate}
         <p class="text-xs text-gray-500 dark:text-gray-500 mt-1">
@@ -94,7 +96,7 @@
       </div>
     {:else if hardwareInfo}
       <!-- 硬件监控面板 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <!-- CPU 监控 -->
         <CpuMonitor cpuInfo={hardwareInfo.cpu} />
 
@@ -105,10 +107,20 @@
         <DiskMonitor diskInfo={hardwareInfo.disk} />
       </div>
 
+      <!-- 网络和告警面板 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- 网络拓扑面板 -->
+        <NetworkPanel />
+
+        <!-- 告警规则面板 -->
+        <AlertPanel />
+      </div>
+
       <!-- 底部信息 -->
       <div class="mt-6 text-center text-xs text-gray-500 dark:text-gray-500">
-        <p>✨ Tauri + Svelte 5 + Rust</p>
-        <p class="mt-1">🔄 自动刷新间隔: 1 秒</p>
+        <p>✨ Tauri + Svelte 5 + Rust + P2P</p>
+        <p class="mt-1">🔄 硬件监控: 1秒 | 网络发现: 5秒 | 告警检测: 10秒</p>
+        <p class="mt-1">🌐 mDNS 自动发现 | 📡 HTTP API (端口 3030)</p>
       </div>
     {/if}
   </div>

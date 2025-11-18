@@ -18,6 +18,34 @@ serde_json = "1"
 sysinfo = "0.32"
 chrono = "0.4"
 
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+
+# HTTP 服务器与 WebSocket
+warp = "0.3"
+
+# 本地网络设备发现 (mDNS/DNS-SD)
+mdns-sd = "0.11"
+
+# 轻量级数据存储（告警历史、时序数据）
+sled = "0.34"
+
+# UUID 生成（节点 ID）
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# 本地桌面通知
+notify-rust = "4"
+
+# 日志
+log = "0.4"
+env_logger = "0.11"
+
+# 跨平台本地 IP 获取
+local-ip-address = "0.6"
+
+# HTTP 客户端
+reqwest = { version = "0.12", features = ["json"] }
+
 [features]
 # 默认包含自定义协议
 default = ["custom-protocol"]
