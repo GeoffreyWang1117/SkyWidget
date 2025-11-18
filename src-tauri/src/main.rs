@@ -10,7 +10,7 @@ use alerts::engine::AlertEngine;
 use alerts::notifier::AlertNotifier;
 use alerts::rules::{default_rules, AlertCondition, AlertRule, AlertSeverity};
 use log::info;
-use monitors::{CpuMonitor, DiskMonitor, MemoryMonitor, TemperatureMonitor};
+use monitors::{CpuMonitor, DiskMonitor, GpuMonitor, MemoryMonitor, TemperatureMonitor};
 use network::api::{start_api_server, ApiState};
 use network::discovery::DiscoveryService;
 use network::node::{Node, NodeInfo};
@@ -33,6 +33,7 @@ pub struct AppState {
     memory_monitor: Arc<RwLock<MemoryMonitor>>,
     disk_monitor: Arc<RwLock<DiskMonitor>>,
     temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
+    gpu_monitor: Arc<RwLock<GpuMonitor>>,
     node_info: Arc<RwLock<NodeInfo>>,
     discovered_nodes: Arc<RwLock<Vec<NodeInfo>>>,
     alert_engine: Arc<RwLock<Option<Arc<AlertEngine>>>>,
@@ -277,6 +278,27 @@ async fn get_metrics_history(
     }
 }
 
+// 获取 GPU 信息
+#[tauri::command]
+async fn get_gpu_info(state: State<'_, AppState>) -> Result<Vec<monitors::gpu::GpuInfo>, String> {
+    let monitor = state.gpu_monitor.read().await;
+    Ok(monitor.get_info())
+}
+
+// 检查是否支持 GPU 监控
+#[tauri::command]
+async fn is_gpu_supported(state: State<'_, AppState>) -> Result<bool, String> {
+    let monitor = state.gpu_monitor.read().await;
+    Ok(monitor.is_supported())
+}
+
+// 获取支持的 GPU 类型
+#[tauri::command]
+async fn get_supported_gpu_vendors(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let monitor = state.gpu_monitor.read().await;
+    Ok(monitor.get_supported_vendors())
+}
+
 #[tokio::main]
 async fn main() {
     // 初始化日志
@@ -303,6 +325,7 @@ async fn main() {
     let memory_monitor = Arc::new(RwLock::new(MemoryMonitor::new()));
     let disk_monitor = Arc::new(RwLock::new(DiskMonitor::new()));
     let temperature_monitor = Arc::new(RwLock::new(TemperatureMonitor::new()));
+    let gpu_monitor = Arc::new(RwLock::new(GpuMonitor::new()));
 
     // 已发现的节点列表
     let discovered_nodes = Arc::new(RwLock::new(Vec::new()));
@@ -434,6 +457,7 @@ async fn main() {
         memory_monitor: memory_monitor.clone(),
         disk_monitor: disk_monitor.clone(),
         temperature_monitor: temperature_monitor.clone(),
+        gpu_monitor: gpu_monitor.clone(),
         node_info: node_info.clone(),
         discovered_nodes: discovered_nodes.clone(),
         alert_engine,
@@ -480,6 +504,9 @@ async fn main() {
             get_all_hardware_info,
             get_temperature_info,
             is_temperature_supported,
+            get_gpu_info,
+            is_gpu_supported,
+            get_supported_gpu_vendors,
             get_local_node_info,
             get_discovered_nodes,
             get_alert_rules,

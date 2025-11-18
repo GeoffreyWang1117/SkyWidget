@@ -46,11 +46,16 @@ local-ip-address = "0.6"
 # HTTP 客户端
 reqwest = { version = "0.12", features = ["json"] }
 
+# GPU 监控
+nvml-wrapper = { version = "0.10", optional = true }
+
 [features]
-# 默认包含自定义协议
-default = ["custom-protocol"]
+# 默认包含自定义协议和 NVIDIA GPU 支持
+default = ["custom-protocol", "nvidia"]
 # 自定义协议功能
 custom-protocol = ["tauri/custom-protocol"]
+# NVIDIA GPU 监控支持（可选）
+nvidia = ["nvml-wrapper"]
 
 [profile.release]
 # 发布版本优化

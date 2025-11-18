@@ -11,6 +11,7 @@
   import AddAlertRulePanel from './lib/components/AddAlertRulePanel.svelte'
   import TemperatureMonitor from './lib/components/TemperatureMonitor.svelte'
   import MetricsChart from './lib/components/MetricsChart.svelte'
+  import GpuMonitor from './lib/components/GpuMonitor.svelte'
 
   let hardwareInfo = $state<AllHardwareInfo | null>(null)
   let loading = $state(true)
@@ -112,6 +113,11 @@
 
         <!-- 温度监控 -->
         <TemperatureMonitor />
+      </div>
+
+      <!-- GPU 监控 -->
+      <div class="mb-6">
+        <GpuMonitor />
       </div>
 
       <!-- 网络和告警面板 -->
