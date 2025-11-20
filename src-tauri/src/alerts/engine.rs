@@ -6,7 +6,7 @@ use tokio::time::{interval, Duration};
 
 use super::notifier::AlertNotifier;
 use super::rules::{AlertRule, AlertSeverity};
-use crate::monitors::{CpuMonitor, DiskMonitor, FanMonitor, MemoryMonitor, TemperatureMonitor};
+use crate::monitors::{CpuMonitor, DiskMonitor, FanMonitor, MemoryMonitor, PowerMonitor, TemperatureMonitor};
 use crate::storage::alerts_store::AlertsStore;
 
 /// 告警引擎
@@ -32,6 +32,9 @@ pub struct AlertEngine {
     /// 风扇监控器
     fan_monitor: Arc<RwLock<FanMonitor>>,
 
+    /// 电源监控器
+    power_monitor: Arc<RwLock<PowerMonitor>>,
+
     /// 告警历史存储
     alerts_store: Option<Arc<RwLock<AlertsStore>>>,
 }
@@ -46,6 +49,7 @@ impl AlertEngine {
         disk_monitor: Arc<RwLock<DiskMonitor>>,
         temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
         fan_monitor: Arc<RwLock<FanMonitor>>,
+        power_monitor: Arc<RwLock<PowerMonitor>>,
     ) -> Self {
         Self {
             rules: Arc::new(RwLock::new(rules)),
@@ -55,6 +59,7 @@ impl AlertEngine {
             disk_monitor,
             temperature_monitor,
             fan_monitor,
+            power_monitor,
             alerts_store: None,
         }
     }
@@ -75,6 +80,7 @@ impl AlertEngine {
         let disk_monitor = self.disk_monitor.clone();
         let temperature_monitor = self.temperature_monitor.clone();
         let fan_monitor = self.fan_monitor.clone();
+        let power_monitor = self.power_monitor.clone();
         let alerts_store = self.alerts_store.clone();
 
         tokio::spawn(async move {
@@ -90,6 +96,7 @@ impl AlertEngine {
                     &disk_monitor,
                     &temperature_monitor,
                     &fan_monitor,
+                    &power_monitor,
                 ).await;
 
                 // 检查所有规则
@@ -134,6 +141,7 @@ impl AlertEngine {
         disk_monitor: &Arc<RwLock<DiskMonitor>>,
         temperature_monitor: &Arc<RwLock<TemperatureMonitor>>,
         fan_monitor: &Arc<RwLock<FanMonitor>>,
+        power_monitor: &Arc<RwLock<PowerMonitor>>,
     ) -> HashMap<String, f32> {
         let mut metrics = HashMap::new();
 
@@ -155,6 +163,20 @@ impl AlertEngine {
             };
             metrics.insert("memory_usage_percent".to_string(), usage_percent);
             metrics.insert("memory_used_gb".to_string(), memory_info.used as f32 / (1024.0 * 1024.0 * 1024.0));
+
+            // 内存温度
+            if let Some(ref temp) = memory_info.temperature {
+                if let Some(temp_val) = temp.temperature {
+                    metrics.insert("memory_temperature".to_string(), temp_val);
+                }
+            }
+
+            // 内存 ECC 错误
+            if let Some(ref errors) = memory_info.errors {
+                if let Some(uncorrectable) = errors.uncorrectable_errors {
+                    metrics.insert("memory_uncorrectable_errors".to_string(), uncorrectable as f32);
+                }
+            }
         }
 
         // 磁盘指标
@@ -178,6 +200,13 @@ impl AlertEngine {
             };
 
             metrics.insert("disk_usage_percent".to_string(), usage_percent);
+
+            // 磁盘温度和健康状态
+            if let Some(max_temp) = disk_info.max_disk_temperature {
+                metrics.insert("disk_max_temperature".to_string(), max_temp);
+            }
+            metrics.insert("disk_warning_count".to_string(), disk_info.warning_disks as f32);
+            metrics.insert("disk_critical_count".to_string(), disk_info.critical_disks as f32);
         }
 
         // 温度指标
@@ -209,6 +238,15 @@ impl AlertEngine {
 
             // 总风扇数量
             metrics.insert("fans_total_count".to_string(), fan_info.total_count as f32);
+        }
+
+        // 电源/电压指标
+        {
+            let mut power = power_monitor.write().await;
+            let power_info = power.get_info();
+
+            // 异常电压数量
+            metrics.insert("voltage_abnormal_count".to_string(), power_info.abnormal_count as f32);
         }
 
         metrics

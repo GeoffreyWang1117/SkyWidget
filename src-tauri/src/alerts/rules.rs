@@ -38,6 +38,21 @@ pub enum AlertCondition {
     /// 风扇转速过低
     FanSlowSpeed,
 
+    /// NVMe/SSD 温度过高
+    DiskTemperatureAbove(f32),
+
+    /// 磁盘健康警告
+    DiskHealthWarning,
+
+    /// 电压异常
+    VoltageAbnormal,
+
+    /// 内存温度过高
+    MemoryTemperatureAbove(f32),
+
+    /// 内存 ECC 错误
+    MemoryErrors,
+
     /// 自定义条件
     Custom {
         metric_name: String,
@@ -165,6 +180,43 @@ impl AlertRule {
                     false
                 }
             }
+            AlertCondition::DiskTemperatureAbove(threshold) => {
+                if let Some(&temp) = metrics.get("disk_max_temperature") {
+                    temp > *threshold
+                } else {
+                    false
+                }
+            }
+            AlertCondition::DiskHealthWarning => {
+                if let Some(&warning_disks) = metrics.get("disk_warning_count") {
+                    warning_disks > 0.0
+                } else if let Some(&critical_disks) = metrics.get("disk_critical_count") {
+                    critical_disks > 0.0
+                } else {
+                    false
+                }
+            }
+            AlertCondition::VoltageAbnormal => {
+                if let Some(&abnormal) = metrics.get("voltage_abnormal_count") {
+                    abnormal > 0.0
+                } else {
+                    false
+                }
+            }
+            AlertCondition::MemoryTemperatureAbove(threshold) => {
+                if let Some(&temp) = metrics.get("memory_temperature") {
+                    temp > *threshold
+                } else {
+                    false
+                }
+            }
+            AlertCondition::MemoryErrors => {
+                if let Some(&uncorrectable) = metrics.get("memory_uncorrectable_errors") {
+                    uncorrectable > 0.0
+                } else {
+                    false
+                }
+            }
             AlertCondition::Custom {
                 metric_name,
                 threshold,
@@ -237,6 +289,49 @@ impl AlertRule {
                     self.name, slow_count
                 )
             }
+            AlertCondition::DiskTemperatureAbove(threshold) => {
+                let temp = metrics.get("disk_max_temperature").unwrap_or(&0.0);
+                format!(
+                    "🔥 {}: NVMe/SSD 温度 {:.1}°C 超过阈值 {:.1}°C！可能导致性能下降或数据丢失！",
+                    self.name, temp, threshold
+                )
+            }
+            AlertCondition::DiskHealthWarning => {
+                let warning = metrics.get("disk_warning_count").unwrap_or(&0.0) as i32;
+                let critical = metrics.get("disk_critical_count").unwrap_or(&0.0) as i32;
+                if critical > 0 {
+                    format!(
+                        "🚨 {}: 检测到 {} 个磁盘处于严重状态！请立即备份数据！",
+                        self.name, critical
+                    )
+                } else {
+                    format!(
+                        "⚠️ {}: 检测到 {} 个磁盘健康状态警告！建议检查磁盘状态。",
+                        self.name, warning
+                    )
+                }
+            }
+            AlertCondition::VoltageAbnormal => {
+                let abnormal = metrics.get("voltage_abnormal_count").unwrap_or(&0.0) as i32;
+                format!(
+                    "⚡ {}: 检测到 {} 个电压异常！可能导致系统不稳定或损坏硬件！",
+                    self.name, abnormal
+                )
+            }
+            AlertCondition::MemoryTemperatureAbove(threshold) => {
+                let temp = metrics.get("memory_temperature").unwrap_or(&0.0);
+                format!(
+                    "🔥 {}: 内存温度 {:.1}°C 超过阈值 {:.1}°C！可能导致系统不稳定！",
+                    self.name, temp, threshold
+                )
+            }
+            AlertCondition::MemoryErrors => {
+                let uncorrectable = metrics.get("memory_uncorrectable_errors").unwrap_or(&0.0) as i32;
+                format!(
+                    "🚨 {}: 检测到 {} 个内存不可纠正错误！可能导致系统崩溃或数据损坏！",
+                    self.name, uncorrectable
+                )
+            }
             AlertCondition::Custom { metric_name, .. } => {
                 format!("{}: 自定义指标 {} 触发告警", self.name, metric_name)
             }
@@ -307,6 +402,48 @@ pub fn default_rules() -> Vec<AlertRule> {
             "检测到风扇转速过低，请检查风扇状态".to_string(),
             AlertCondition::FanSlowSpeed,
             AlertSeverity::Warning,
+        ),
+        AlertRule::new(
+            "nvme_temp_high".to_string(),
+            "NVMe/SSD 温度过高".to_string(),
+            "NVMe/SSD 温度超过 70°C，可能导致性能下降".to_string(),
+            AlertCondition::DiskTemperatureAbove(70.0),
+            AlertSeverity::Warning,
+        ),
+        AlertRule::new(
+            "nvme_temp_critical".to_string(),
+            "NVMe/SSD 温度严重".to_string(),
+            "NVMe/SSD 温度超过 80°C，可能导致数据丢失".to_string(),
+            AlertCondition::DiskTemperatureAbove(80.0),
+            AlertSeverity::Critical,
+        ),
+        AlertRule::new(
+            "disk_health_warning".to_string(),
+            "磁盘健康警告".to_string(),
+            "检测到磁盘健康状态异常，请检查 SMART 状态".to_string(),
+            AlertCondition::DiskHealthWarning,
+            AlertSeverity::Error,
+        ),
+        AlertRule::new(
+            "voltage_abnormal".to_string(),
+            "电压异常告警".to_string(),
+            "检测到电压偏离正常范围，可能影响系统稳定性".to_string(),
+            AlertCondition::VoltageAbnormal,
+            AlertSeverity::Warning,
+        ),
+        AlertRule::new(
+            "memory_temp_high".to_string(),
+            "内存温度过高".to_string(),
+            "内存温度超过 75°C，可能影响系统稳定性".to_string(),
+            AlertCondition::MemoryTemperatureAbove(75.0),
+            AlertSeverity::Warning,
+        ),
+        AlertRule::new(
+            "memory_errors_critical".to_string(),
+            "内存错误严重告警".to_string(),
+            "检测到内存不可纠正错误，系统可能不稳定".to_string(),
+            AlertCondition::MemoryErrors,
+            AlertSeverity::Critical,
         ),
     ]
 }
