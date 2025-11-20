@@ -32,6 +32,12 @@ pub enum AlertCondition {
     /// 南桥/PCH 温度超过阈值 (°C)
     ChipsetTemperatureAbove(f32),
 
+    /// 风扇已停转
+    FanStopped,
+
+    /// 风扇转速过低
+    FanSlowSpeed,
+
     /// 自定义条件
     Custom {
         metric_name: String,
@@ -145,6 +151,20 @@ impl AlertRule {
                     false
                 }
             }
+            AlertCondition::FanStopped => {
+                if let Some(&stopped) = metrics.get("fans_stopped_count") {
+                    stopped > 0.0
+                } else {
+                    false
+                }
+            }
+            AlertCondition::FanSlowSpeed => {
+                if let Some(&slow) = metrics.get("fans_slow_speed_count") {
+                    slow > 0.0
+                } else {
+                    false
+                }
+            }
             AlertCondition::Custom {
                 metric_name,
                 threshold,
@@ -203,6 +223,20 @@ impl AlertRule {
                     self.name, temp, threshold
                 )
             }
+            AlertCondition::FanStopped => {
+                let stopped_count = metrics.get("fans_stopped_count").unwrap_or(&0.0) as i32;
+                format!(
+                    "🚨 {}: 检测到 {} 个风扇已停转！可能导致硬件过热和损坏！",
+                    self.name, stopped_count
+                )
+            }
+            AlertCondition::FanSlowSpeed => {
+                let slow_count = metrics.get("fans_slow_speed_count").unwrap_or(&0.0) as i32;
+                format!(
+                    "⚠️ {}: 检测到 {} 个风扇转速过低！请检查风扇状态。",
+                    self.name, slow_count
+                )
+            }
             AlertCondition::Custom { metric_name, .. } => {
                 format!("{}: 自定义指标 {} 触发告警", self.name, metric_name)
             }
@@ -259,6 +293,20 @@ pub fn default_rules() -> Vec<AlertRule> {
             "南桥/PCH 温度超过 70°C，可能导致磁盘掉线或 CMOS 错误".to_string(),
             AlertCondition::ChipsetTemperatureAbove(70.0),
             AlertSeverity::Critical,
+        ),
+        AlertRule::new(
+            "fan_stopped".to_string(),
+            "风扇停转告警".to_string(),
+            "检测到风扇停转，可能导致硬件过热和损坏".to_string(),
+            AlertCondition::FanStopped,
+            AlertSeverity::Critical,
+        ),
+        AlertRule::new(
+            "fan_slow_speed".to_string(),
+            "风扇转速过低告警".to_string(),
+            "检测到风扇转速过低，请检查风扇状态".to_string(),
+            AlertCondition::FanSlowSpeed,
+            AlertSeverity::Warning,
         ),
     ]
 }

@@ -10,7 +10,7 @@ use alerts::engine::AlertEngine;
 use alerts::notifier::AlertNotifier;
 use alerts::rules::{default_rules, AlertCondition, AlertRule, AlertSeverity};
 use log::info;
-use monitors::{CpuMonitor, DiskMonitor, GpuMonitor, MemoryMonitor, TemperatureMonitor};
+use monitors::{CpuMonitor, DiskMonitor, FanMonitor, GpuMonitor, MemoryMonitor, TemperatureMonitor};
 use network::api::{start_api_server, ApiState};
 use network::discovery::DiscoveryService;
 use network::node::{Node, NodeInfo};
@@ -34,6 +34,7 @@ pub struct AppState {
     disk_monitor: Arc<RwLock<DiskMonitor>>,
     temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
     gpu_monitor: Arc<RwLock<GpuMonitor>>,
+    fan_monitor: Arc<RwLock<FanMonitor>>,
     node_info: Arc<RwLock<NodeInfo>>,
     discovered_nodes: Arc<RwLock<Vec<NodeInfo>>>,
     alert_engine: Arc<RwLock<Option<Arc<AlertEngine>>>>,
@@ -299,6 +300,27 @@ async fn get_supported_gpu_vendors(state: State<'_, AppState>) -> Result<Vec<Str
     Ok(monitor.get_supported_vendors())
 }
 
+// 获取风扇信息
+#[tauri::command]
+async fn get_fan_info(state: State<'_, AppState>) -> Result<monitors::fan::AllFansInfo, String> {
+    let mut monitor = state.fan_monitor.write().await;
+    Ok(monitor.get_info())
+}
+
+// 检查是否支持风扇监控
+#[tauri::command]
+async fn is_fan_supported(state: State<'_, AppState>) -> Result<bool, String> {
+    let monitor = state.fan_monitor.read().await;
+    Ok(monitor.is_supported())
+}
+
+// 检查是否有风扇故障
+#[tauri::command]
+async fn has_fan_failures(state: State<'_, AppState>) -> Result<bool, String> {
+    let mut monitor = state.fan_monitor.write().await;
+    Ok(monitor.has_fan_failures())
+}
+
 #[tokio::main]
 async fn main() {
     // 初始化日志
@@ -326,6 +348,7 @@ async fn main() {
     let disk_monitor = Arc::new(RwLock::new(DiskMonitor::new()));
     let temperature_monitor = Arc::new(RwLock::new(TemperatureMonitor::new()));
     let gpu_monitor = Arc::new(RwLock::new(GpuMonitor::new()));
+    let fan_monitor = Arc::new(RwLock::new(FanMonitor::new()));
 
     // 已发现的节点列表
     let discovered_nodes = Arc::new(RwLock::new(Vec::new()));
@@ -383,6 +406,7 @@ async fn main() {
         memory_monitor.clone(),
         disk_monitor.clone(),
         temperature_monitor.clone(),
+        fan_monitor.clone(),
     );
 
     // 设置告警历史存储
@@ -459,6 +483,7 @@ async fn main() {
         disk_monitor: disk_monitor.clone(),
         temperature_monitor: temperature_monitor.clone(),
         gpu_monitor: gpu_monitor.clone(),
+        fan_monitor: fan_monitor.clone(),
         node_info: node_info.clone(),
         discovered_nodes: discovered_nodes.clone(),
         alert_engine,
@@ -508,6 +533,9 @@ async fn main() {
             get_gpu_info,
             is_gpu_supported,
             get_supported_gpu_vendors,
+            get_fan_info,
+            is_fan_supported,
+            has_fan_failures,
             get_local_node_info,
             get_discovered_nodes,
             get_alert_rules,

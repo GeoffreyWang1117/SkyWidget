@@ -6,7 +6,7 @@ use tokio::time::{interval, Duration};
 
 use super::notifier::AlertNotifier;
 use super::rules::{AlertRule, AlertSeverity};
-use crate::monitors::{CpuMonitor, DiskMonitor, MemoryMonitor, TemperatureMonitor};
+use crate::monitors::{CpuMonitor, DiskMonitor, FanMonitor, MemoryMonitor, TemperatureMonitor};
 use crate::storage::alerts_store::AlertsStore;
 
 /// 告警引擎
@@ -29,6 +29,9 @@ pub struct AlertEngine {
     /// 温度监控器
     temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
 
+    /// 风扇监控器
+    fan_monitor: Arc<RwLock<FanMonitor>>,
+
     /// 告警历史存储
     alerts_store: Option<Arc<RwLock<AlertsStore>>>,
 }
@@ -42,6 +45,7 @@ impl AlertEngine {
         memory_monitor: Arc<RwLock<MemoryMonitor>>,
         disk_monitor: Arc<RwLock<DiskMonitor>>,
         temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
+        fan_monitor: Arc<RwLock<FanMonitor>>,
     ) -> Self {
         Self {
             rules: Arc::new(RwLock::new(rules)),
@@ -50,6 +54,7 @@ impl AlertEngine {
             memory_monitor,
             disk_monitor,
             temperature_monitor,
+            fan_monitor,
             alerts_store: None,
         }
     }
@@ -69,6 +74,7 @@ impl AlertEngine {
         let memory_monitor = self.memory_monitor.clone();
         let disk_monitor = self.disk_monitor.clone();
         let temperature_monitor = self.temperature_monitor.clone();
+        let fan_monitor = self.fan_monitor.clone();
         let alerts_store = self.alerts_store.clone();
 
         tokio::spawn(async move {
@@ -83,6 +89,7 @@ impl AlertEngine {
                     &memory_monitor,
                     &disk_monitor,
                     &temperature_monitor,
+                    &fan_monitor,
                 ).await;
 
                 // 检查所有规则
@@ -126,6 +133,7 @@ impl AlertEngine {
         memory_monitor: &Arc<RwLock<MemoryMonitor>>,
         disk_monitor: &Arc<RwLock<DiskMonitor>>,
         temperature_monitor: &Arc<RwLock<TemperatureMonitor>>,
+        fan_monitor: &Arc<RwLock<FanMonitor>>,
     ) -> HashMap<String, f32> {
         let mut metrics = HashMap::new();
 
@@ -186,6 +194,21 @@ impl AlertEngine {
             if let Some(chipset_temp) = temp_info.chipset_temp {
                 metrics.insert("chipset_temperature".to_string(), chipset_temp);
             }
+        }
+
+        // 风扇指标（关键！）
+        {
+            let mut fan = fan_monitor.write().await;
+            let fan_info = fan.get_info();
+
+            // 停转风扇数量
+            metrics.insert("fans_stopped_count".to_string(), fan_info.stopped_count as f32);
+
+            // 转速过低风扇数量
+            metrics.insert("fans_slow_speed_count".to_string(), fan_info.slow_speed_count as f32);
+
+            // 总风扇数量
+            metrics.insert("fans_total_count".to_string(), fan_info.total_count as f32);
         }
 
         metrics

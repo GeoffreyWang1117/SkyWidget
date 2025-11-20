@@ -12,6 +12,7 @@
   import TemperatureMonitor from './lib/components/TemperatureMonitor.svelte'
   import MetricsChart from './lib/components/MetricsChart.svelte'
   import GpuMonitor from './lib/components/GpuMonitor.svelte'
+  import FanMonitor from './lib/components/FanMonitor.svelte'
 
   let hardwareInfo = $state<AllHardwareInfo | null>(null)
   let loading = $state(true)
@@ -115,9 +116,10 @@
         <TemperatureMonitor />
       </div>
 
-      <!-- GPU 监控 -->
-      <div class="mb-6">
+      <!-- GPU 和风扇监控 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <GpuMonitor />
+        <FanMonitor />
       </div>
 
       <!-- 网络和告警面板 -->
