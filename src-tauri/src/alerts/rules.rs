@@ -29,6 +29,9 @@ pub enum AlertCondition {
     /// CPU 温度超过阈值 (°C) - 预留
     CpuTemperatureAbove(f32),
 
+    /// 南桥/PCH 温度超过阈值 (°C)
+    ChipsetTemperatureAbove(f32),
+
     /// 自定义条件
     Custom {
         metric_name: String,
@@ -135,6 +138,13 @@ impl AlertRule {
                     false
                 }
             }
+            AlertCondition::ChipsetTemperatureAbove(threshold) => {
+                if let Some(&temp) = metrics.get("chipset_temperature") {
+                    temp > *threshold
+                } else {
+                    false
+                }
+            }
             AlertCondition::Custom {
                 metric_name,
                 threshold,
@@ -186,6 +196,13 @@ impl AlertRule {
                     self.name, temp, threshold
                 )
             }
+            AlertCondition::ChipsetTemperatureAbove(threshold) => {
+                let temp = metrics.get("chipset_temperature").unwrap_or(&0.0);
+                format!(
+                    "⚠️ {}: 南桥/PCH 温度 {:.1}°C 超过阈值 {:.1}°C！可能导致磁盘掉线或 CMOS 错误！",
+                    self.name, temp, threshold
+                )
+            }
             AlertCondition::Custom { metric_name, .. } => {
                 format!("{}: 自定义指标 {} 触发告警", self.name, metric_name)
             }
@@ -228,6 +245,20 @@ pub fn default_rules() -> Vec<AlertRule> {
             "磁盘使用率超过 90%".to_string(),
             AlertCondition::DiskUsageAbove(90.0),
             AlertSeverity::Warning,
+        ),
+        AlertRule::new(
+            "chipset_warning".to_string(),
+            "南桥温度警告".to_string(),
+            "南桥/PCH 温度超过 60°C，可能影响系统稳定性".to_string(),
+            AlertCondition::ChipsetTemperatureAbove(60.0),
+            AlertSeverity::Warning,
+        ),
+        AlertRule::new(
+            "chipset_critical".to_string(),
+            "南桥温度严重告警".to_string(),
+            "南桥/PCH 温度超过 70°C，可能导致磁盘掉线或 CMOS 错误".to_string(),
+            AlertCondition::ChipsetTemperatureAbove(70.0),
+            AlertSeverity::Critical,
         ),
     ]
 }

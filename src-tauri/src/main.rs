@@ -382,6 +382,7 @@ async fn main() {
         cpu_monitor.clone(),
         memory_monitor.clone(),
         disk_monitor.clone(),
+        temperature_monitor.clone(),
     );
 
     // 设置告警历史存储

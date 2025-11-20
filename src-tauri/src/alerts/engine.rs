@@ -6,7 +6,7 @@ use tokio::time::{interval, Duration};
 
 use super::notifier::AlertNotifier;
 use super::rules::{AlertRule, AlertSeverity};
-use crate::monitors::{CpuMonitor, DiskMonitor, MemoryMonitor};
+use crate::monitors::{CpuMonitor, DiskMonitor, MemoryMonitor, TemperatureMonitor};
 use crate::storage::alerts_store::AlertsStore;
 
 /// 告警引擎
@@ -26,6 +26,9 @@ pub struct AlertEngine {
     /// 磁盘监控器
     disk_monitor: Arc<RwLock<DiskMonitor>>,
 
+    /// 温度监控器
+    temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
+
     /// 告警历史存储
     alerts_store: Option<Arc<RwLock<AlertsStore>>>,
 }
@@ -38,6 +41,7 @@ impl AlertEngine {
         cpu_monitor: Arc<RwLock<CpuMonitor>>,
         memory_monitor: Arc<RwLock<MemoryMonitor>>,
         disk_monitor: Arc<RwLock<DiskMonitor>>,
+        temperature_monitor: Arc<RwLock<TemperatureMonitor>>,
     ) -> Self {
         Self {
             rules: Arc::new(RwLock::new(rules)),
@@ -45,6 +49,7 @@ impl AlertEngine {
             cpu_monitor,
             memory_monitor,
             disk_monitor,
+            temperature_monitor,
             alerts_store: None,
         }
     }
@@ -63,6 +68,7 @@ impl AlertEngine {
         let cpu_monitor = self.cpu_monitor.clone();
         let memory_monitor = self.memory_monitor.clone();
         let disk_monitor = self.disk_monitor.clone();
+        let temperature_monitor = self.temperature_monitor.clone();
         let alerts_store = self.alerts_store.clone();
 
         tokio::spawn(async move {
@@ -76,6 +82,7 @@ impl AlertEngine {
                     &cpu_monitor,
                     &memory_monitor,
                     &disk_monitor,
+                    &temperature_monitor,
                 ).await;
 
                 // 检查所有规则
@@ -118,6 +125,7 @@ impl AlertEngine {
         cpu_monitor: &Arc<RwLock<CpuMonitor>>,
         memory_monitor: &Arc<RwLock<MemoryMonitor>>,
         disk_monitor: &Arc<RwLock<DiskMonitor>>,
+        temperature_monitor: &Arc<RwLock<TemperatureMonitor>>,
     ) -> HashMap<String, f32> {
         let mut metrics = HashMap::new();
 
@@ -162,6 +170,22 @@ impl AlertEngine {
             };
 
             metrics.insert("disk_usage_percent".to_string(), usage_percent);
+        }
+
+        // 温度指标
+        {
+            let mut temp = temperature_monitor.write().await;
+            let temp_info = temp.get_info();
+
+            // CPU 温度
+            if let Some(cpu_temp) = temp_info.cpu_avg_temp {
+                metrics.insert("cpu_temperature".to_string(), cpu_temp);
+            }
+
+            // 南桥/PCH 温度（关键！）
+            if let Some(chipset_temp) = temp_info.chipset_temp {
+                metrics.insert("chipset_temperature".to_string(), chipset_temp);
+            }
         }
 
         metrics
