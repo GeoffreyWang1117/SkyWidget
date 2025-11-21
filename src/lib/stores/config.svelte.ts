@@ -40,6 +40,9 @@ class ConfigState {
   // 是否有未保存的更改
   hasUnsavedChanges = $state(false);
 
+  // 是否处于编辑模式（用于拖拽布局）
+  isEditMode = $state(false);
+
   // 派生状态：可见组件列表
   visibleComponents = $derived(
     this.config.components
@@ -369,6 +372,59 @@ class ConfigState {
     this.updatePerformance((perf) => ({
       ...perf,
       enableHardwareAcceleration: !perf.enableHardwareAcceleration,
+    }));
+  }
+
+  /**
+   * 切换编辑模式
+   */
+  toggleEditMode(): void {
+    this.isEditMode = !this.isEditMode;
+  }
+
+  /**
+   * 设置编辑模式
+   */
+  setEditMode(enabled: boolean): void {
+    this.isEditMode = enabled;
+  }
+
+  /**
+   * 重新排序组件（用于拖拽后保存）
+   */
+  reorderComponents(newComponents: ComponentConfig[]): void {
+    // 更新 order 字段以反映新顺序
+    const reorderedComponents = newComponents.map((comp, index) => ({
+      ...comp,
+      order: index + 1,
+    }));
+
+    this.update((config) => ({
+      ...config,
+      components: reorderedComponents,
+    }));
+  }
+
+  /**
+   * 更新可见组件的顺序（仅重排可见组件）
+   */
+  reorderVisibleComponents(newVisibleComponents: ComponentConfig[]): void {
+    // 创建一个映射，保存新的顺序
+    const orderMap = new Map(
+      newVisibleComponents.map((comp, index) => [comp.id, index + 1])
+    );
+
+    // 更新所有组件，只修改可见组件的 order
+    const updatedComponents = this.config.components.map((comp) => {
+      if (orderMap.has(comp.id)) {
+        return { ...comp, order: orderMap.get(comp.id)! };
+      }
+      return comp;
+    });
+
+    this.update((config) => ({
+      ...config,
+      components: updatedComponents,
     }));
   }
 }

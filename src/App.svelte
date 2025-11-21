@@ -74,13 +74,23 @@
           </p>
         {/if}
       </div>
-      <button
-        class="settings-button"
-        onclick={() => (settingsOpen = true)}
-        title="设置"
-      >
-        ⚙️
-      </button>
+      <div class="action-buttons">
+        <button
+          class="edit-button"
+          class:active={configStore.isEditMode}
+          onclick={() => configStore.toggleEditMode()}
+          title={configStore.isEditMode ? '退出编辑模式' : '进入编辑模式'}
+        >
+          {configStore.isEditMode ? '✓' : '✎'}
+        </button>
+        <button
+          class="settings-button"
+          onclick={() => (settingsOpen = true)}
+          title="设置"
+        >
+          ⚙️
+        </button>
+      </div>
     </div>
 
     {#if loading}
@@ -104,6 +114,25 @@
         </button>
       </div>
     {:else if hardwareInfo}
+      <!-- 编辑模式提示 -->
+      {#if configStore.isEditMode}
+        <div class="edit-mode-banner">
+          <div class="banner-content">
+            <span class="banner-icon">✎</span>
+            <span class="banner-text">编辑模式：拖动组件调整顺序</span>
+            <button
+              class="banner-done"
+              onclick={() => {
+                configStore.setEditMode(false);
+                configStore.save();
+              }}
+            >
+              完成
+            </button>
+          </div>
+        </div>
+      {/if}
+
       <!-- 动态布局容器 -->
       <DynamicLayout />
 
@@ -135,14 +164,20 @@
     color: #f9fafb;
   }
 
-  .settings-button {
+  .action-buttons {
     position: fixed;
     top: 1rem;
     right: 1rem;
+    display: flex;
+    gap: 0.75rem;
+    z-index: 100;
+  }
+
+  .edit-button,
+  .settings-button {
     width: 3rem;
     height: 3rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
     color: white;
     font-size: 1.5rem;
@@ -152,7 +187,38 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
+  }
+
+  .edit-button {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
+
+  .edit-button.active {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
+  .edit-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3);
+  }
+
+  .edit-button.active:hover {
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .settings-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
 
   .settings-button:hover {
@@ -160,7 +226,78 @@
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
   }
 
+  .edit-button:active,
+  .settings-button:active {
+    transform: scale(0.95);
+  }
+
+  .edit-button.active:active {
+    transform: scale(0.95);
+  }
+
   .settings-button:active {
     transform: scale(0.95) rotate(90deg);
+  }
+
+  /* 编辑模式横幅 */
+  .edit-mode-banner {
+    position: sticky;
+    top: 0;
+    z-index: 90;
+    margin: -1rem -4rem 1rem -4rem;
+    padding: 1rem 4rem;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    animation: slideDown 0.3s ease-out;
+  }
+
+  @keyframes slideDown {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .banner-content {
+    max-width: 72rem;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: white;
+    font-weight: 500;
+  }
+
+  .banner-icon {
+    font-size: 1.5rem;
+  }
+
+  .banner-text {
+    flex: 1;
+    font-size: 1rem;
+  }
+
+  .banner-done {
+    padding: 0.5rem 1.5rem;
+    background: white;
+    color: #059669;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .banner-done:hover {
+    background: #f0fdf4;
+    transform: scale(1.05);
+  }
+
+  .banner-done:active {
+    transform: scale(0.95);
   }
 </style>
